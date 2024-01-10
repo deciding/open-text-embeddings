@@ -24,6 +24,8 @@ setup(
                    "fastapi>=0.100.0",
                    "pydantic-settings>=2.0.1",
                    "sentence_transformers>=2.2.2",
+                   "InstructorEmbedding",
+                   "tiktoken",
                    ],
     },
     python_requires=">=3.7",

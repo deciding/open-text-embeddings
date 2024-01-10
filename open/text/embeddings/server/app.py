@@ -13,8 +13,11 @@ from open.text.embeddings.server.gzip import GZipRequestMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 import pydantic
 from transformers import AutoTokenizer
+import tiktoken
 
 router = APIRouter()
+
+encoding = tiktoken.get_encoding("cl100k_base")
 
 DEFAULT_MODEL_NAME = "intfloat/e5-large-v2"
 E5_EMBED_INSTRUCTION = "passage: "
@@ -50,7 +53,8 @@ def create_app():
 class CreateEmbeddingRequest(BaseModel):
     model: Optional[str] = Field(
         description="The model to use for generating embeddings.", default=None)
-    input: Union[str, List[str]] = Field(description="The input to embed.")
+    #input: Union[str, List[str]] = Field(description="The input to embed.")
+    input: Union[str, List[List[int]]] = Field(description="The input to embed.")
     user: Optional[str] = Field(default=None)
 
     model_config = {
@@ -114,7 +118,7 @@ def initialize_embeddings():
     }
     print("Normalize embeddings:", normalize_embeddings)
     tokenizer = AutoTokenizer.from_pretrained(model_name)
-    if "e5" in model_name:
+    if "e5" in model_name or 'instructor' in model_name:
         embeddings = HuggingFaceInstructEmbeddings(model_name=model_name,
                                                    embed_instruction=E5_EMBED_INSTRUCTION,
                                                    query_instruction=E5_QUERY_INSTRUCTION,
@@ -136,12 +140,22 @@ def initialize_embeddings():
                                            model_kwargs={"device": device})
 
 
-def _create_embedding(input: Union[str, List[str]]):
+#def _create_embedding(input: Union[str, List[str]]):
+def _create_embedding(input: Union[List[int], List[List[int]]]):
     global embeddings
     model_name = os.environ.get("MODEL")
     if model_name is None:
         model_name = DEFAULT_MODEL_NAME
     model_name_short = model_name.split("/")[-1]
+
+    # detokenize tiktoken in OpenAIEmbeddings
+    if isinstance(input, list):
+        if isinstance(input[0], int):
+            input = encoding.decode(input)
+        elif isinstance(input[0], list):
+            if isinstance(input[0][0], int):
+                input = [encoding.decode(i) for i in input]
+        
     if isinstance(input, str):
         tokens = tokenizer.tokenize(input)
         return CreateEmbeddingResponse(data=[Embedding(embedding=embeddings.embed_query(input),

@@ -50,6 +50,7 @@ class GZipRequestMiddleware(BaseHTTPMiddleware):
         request._receive = receive
 
     async def dispatch(self, request, call_next):
-        await self.set_body(request)
+        #await self.set_body(request)
+        await request.body()
         response = await call_next(request)
         return response
